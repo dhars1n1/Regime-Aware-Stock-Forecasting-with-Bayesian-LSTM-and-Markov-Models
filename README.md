@@ -17,7 +17,7 @@ This project aims to:
 
 ## 🧠 Techniques Used
 
-- **Markov Switching Models (MSM)** – regime detection using time series volatility/returns
+- **Markov Switching Models (MSM)** – regime detection using time series market indicators
 - **Bayesian LSTM** – LSTM with Monte Carlo Dropout for uncertainty-aware forecasting
 - **Technical Indicators** – RSI, Moving Averages, MACD, Bollinger Bands, etc.
 
