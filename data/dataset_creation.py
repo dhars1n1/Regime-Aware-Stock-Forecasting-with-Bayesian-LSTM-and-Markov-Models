@@ -109,5 +109,5 @@ df['earnings_season'] = (
 # =====================
 df = df.ffill().dropna()
 print(f"Final dataset shape: {df.shape}")
-df.to_csv("data.csv")
+df.to_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data.csv")
 print("Saved enriched dataset to data.csv")
