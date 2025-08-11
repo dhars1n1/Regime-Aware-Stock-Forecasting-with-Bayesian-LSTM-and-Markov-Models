@@ -1,0 +1,14 @@
+pandas
+numpy
+yfinance
+ta         
+fredapi
+python-dotenv
+scikit-learn
+matplotlib
+seaborn
+scipy
+transformers
+torch
+snscrape
+joblib
