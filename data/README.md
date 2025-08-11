@@ -25,16 +25,24 @@ feature_regime_preprocessing.py → scale, build lags, run multivariate MSM → 
 - **Outputs**: `data_cleaned.csv`
 - **Run if**: You want a cleaned, indexed dataset ready for modeling
 
-### `sentiment.py` (optional)
-- **Purpose**: Produce a daily sentiment score and merge into the main dataset
-- **Modes**:
-  - **Offline hybrid**: Uses `news_archive.csv` (local headlines for pre-2006) + snscrape for tweets (2006+), scores via FinBERT. No external live NewsAPI required
-  - **Online**: Optionally uses NewsAPI for headlines (requires NEWSAPI_KEY) and snscrape for tweets
-- **Inputs**: `data_cleaned.csv` + optionally `news_archive.csv` (for offline) or NEWSAPI_KEY (for online)
-- **Outputs**: `data_with_sentiment.csv`
-- **Run if**: You want sentiment as a feature. If you skip this step, sentiment remains placeholder (zeros)
-
-> **⚠️ Important Compatibility Note**: snscrape is not compatible with Python ≥ 3.12 when imported as a module. Use Python 3.11 for running sentiment.py that imports snscrape. If you must use Python 3.13+, run snscrape via the CLI (subprocess) or create a dedicated Python 3.11 venv.
+### `sentiment.py`
+- **Purpose**: Merge historical sentiment data from the **American Association of Individual Investors** Excel file into your main dataset.
+- **Logic**:
+  1. Reads `sentiment.xls` (skips the first 4 non-data rows).
+  2. Cleans `"xx.x%"` strings into floats for **Bullish**, **Neutral**, **Bearish**.
+  3. Drops rows with no sentiment data.
+  4. Creates `sentiment_score` = Bullish − Bearish.
+  5. Merges sentiment into `data_cleaned.csv` using nearest past date (`merge_asof`), forward-filling values.
+- **Inputs**:
+  - `data_cleaned.csv` (from `eda.py`)
+  - `sentiment.xls` (historical AAII sentiment Excel file)
+- **Outputs**: `data_with_sentiment.csv` — main dataset with added `Bullish`, `Neutral`, `Bearish`, and `sentiment_score`.
+- **Run if**: You have the AAII sentiment Excel and want it included as a predictive feature.
+- **Python version**: Works fine on Python 3.13
+- **Run**:
+  ```bash
+  python data/sentiment.py
+  ```
 
 ### `msm/msm.py`
 - **Purpose**: Contains the from-scratch multivariate MSM implementation (Baum–Welch EM, forward/backward, Viterbi). Exposes function `baum_welch_multivariate(obs, K=3, ...)`
@@ -43,13 +51,13 @@ feature_regime_preprocessing.py → scale, build lags, run multivariate MSM → 
 
 ### `feature_regime_preprocessing.py`
 - **Purpose**: Orchestrates final preprocessing:
-  - Loads `data_cleaned.csv`
+  - Loads `data_with_sentiment.csv`
   - Builds log_return, lag features, normalizes features
   - Prepares multivariate observation array (default: log_return + VIX)
   - Calls `msm.baum_welch_multivariate(...)`
   - Attaches regime_k_prob, regime_viterbi, regime_label
   - Saves `data_with_regimes.csv`
-- **Inputs**: `data_cleaned.csv` (and `msm/msm.py` in parent folder — imports via sys.path adjustment)
+- **Inputs**: `data_with_sentiment.csv` (and `msm/msm.py` in parent folder — imports via sys.path adjustment)
 - **Outputs**: `data_with_regimes.csv` ready for modeling
 
 ## Exact Run Order (Recommended)
@@ -68,7 +76,7 @@ feature_regime_preprocessing.py → scale, build lags, run multivariate MSM → 
    ```
    Produces `data/data_cleaned.csv`
 
-4. **Step 3** (Optional): Add sentiment analysis
+4. **Step 3** Add sentiment analysis
    ```bash
    python data/sentiment.py
    ```
@@ -85,22 +93,14 @@ feature_regime_preprocessing.py → scale, build lags, run multivariate MSM → 
 
 ## Virtual Environments & Python Versions (Recommended)
 
-**Single recommended choice (simpler)**: Use Python 3.11 for the whole project. This avoids snscrape import errors and works well with HuggingFace + torch on macOS M4.
-
 Create and activate a venv in the project root:
 
 ```bash
 # macOS (example)
-python3.11 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 ```
-
-If you cannot install Python 3.11:
-- Use your current venv for everything except `sentiment.py` (for which either:
-  - Create a separate Python 3.11 venv just for sentiment, OR
-  - Modify `sentiment.py` to use snscrape via CLI (subprocess) so you can stay on 3.13+
-
 ## Dependencies
 
 Install with:
@@ -117,7 +117,6 @@ Create `.env` at project root if needed:
 
 ```bash
 FRED_API_KEY=your_fred_api_key_here
-NEWSAPI_KEY=your_newsapi_key_here   # only if you use NewsAPI mode in sentiment.py
 ```
 
 - `data_creation.py` needs `FRED_API_KEY` to successfully fetch CPI / UNRATE / FEDFUNDS. If not present, that code sets NaNs (or you can edit to skip FRED)
@@ -137,7 +136,7 @@ python data/data_creation.py
 # 2. EDA & clean
 python data/eda.py
 
-# 3. optional sentiment (offline hybrid)
+# 3. sentiment addition
 python data/sentiment.py
 
 # 4. feature engineering + regimes
@@ -163,8 +162,6 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from msm.msm import baum_welch_multivariate
 ```
-
-(Your current script should already include this; if not, add it.)
 
 ## Expected Outputs (Summary)
 

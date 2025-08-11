@@ -11,7 +11,7 @@ from msm.msm import baum_welch_multivariate
 
 def main():
     # Load cleaned data
-    df = pd.read_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_cleaned.csv", parse_dates=["Date"])
+    df = pd.read_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_sentiment.csv", parse_dates=["Date"])
     df.set_index("Date", inplace=True)
     print(f"Original shape: {df.shape}")
 
