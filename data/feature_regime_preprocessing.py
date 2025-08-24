@@ -10,8 +10,20 @@ import matplotlib.pyplot as plt
 from msm.msm import baum_welch_multivariate
 
 def main():
-    # Load cleaned data
-    df = pd.read_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_sentiment.csv", parse_dates=["Date"])
+    # Load cleaned data - handle both relative and absolute paths
+    data_file = "data_with_sentiment.csv"
+    if not os.path.exists(data_file):
+        data_file = "Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_sentiment.csv"
+    
+    if not os.path.exists(data_file):
+        print(f"❌ Data file not found. Please ensure data_with_sentiment.csv exists.")
+        print("Run the earlier steps of the pipeline first:")
+        print("1. dataset_creation.py")
+        print("2. eda.py") 
+        print("3. sentiment.py")
+        return
+    
+    df = pd.read_csv(data_file, parse_dates=["Date"])
     df.set_index("Date", inplace=True)
     print(f"Original shape: {df.shape}")
 
@@ -50,9 +62,15 @@ def main():
     mapping = {regime_order[i]: labels[i] for i in range(len(labels))}
     df["regime_label"] = df["regime_viterbi"].map(mapping)
 
-    # Save
-    df.to_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_regimes.csv")
-    print("✅ Saved data_with_regimes.csv")
+    # Save - try relative path first, then absolute
+    output_file = "data_with_regimes.csv"
+    try:
+        df.to_csv(output_file)
+        print(f"✅ Saved {output_file}")
+    except:
+        output_file = "Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_regimes.csv"
+        df.to_csv(output_file)
+        print(f"✅ Saved {output_file}")
 
     # Plot
     plt.figure(figsize=(14, 5))
