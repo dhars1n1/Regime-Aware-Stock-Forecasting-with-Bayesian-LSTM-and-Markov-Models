@@ -1,0 +1,25 @@
+data:
+  exclude_columns:
+  - Date
+  - regime_viterbi
+  - regime_0_prob
+  - regime_1_prob
+  - regime_2_prob
+  feature_columns: auto
+  regime_column: regime_label
+  target_column: log_return
+  test_size: 0.2
+data_path: data/data_with_regimes.csv
+model:
+  dropout_rate: 0.3
+  lstm_units: 64
+  n_monte_carlo: 100
+  sequence_length: 20
+output_dir: results
+prediction:
+  multi_step_horizon: 5
+  n_monte_carlo: 200
+training:
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
