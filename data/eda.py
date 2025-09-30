@@ -13,7 +13,7 @@ from statsmodels.tsa.stattools import adfuller
 # -------------------------
 
 # Read CSV with 2 header rows
-df = pd.read_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data.csv", header=[0,1])
+df = pd.read_csv("data.csv", header=[0,1])
 
 # Drop the first row (tickers) and flatten headers
 df.columns = df.columns.get_level_values(0)
@@ -70,7 +70,7 @@ print(crisis_days.head())
 # 6. Correlation Heatmap
 # -------------------------
 plt.figure(figsize=(12,8))
-sns.heatmap(df.corr(), cmap='coolwarm', annot=False)
+sns.heatmap(df.corr(), cmap='coolwarm', annot=True, fmt=".2f")
 plt.title("Feature Correlation Heatmap")
 plt.show()
 
@@ -96,5 +96,44 @@ plt.show()
 # -------------------------
 # 8. Save cleaned dataset
 # -------------------------
-df.to_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_cleaned.csv")
+df.to_csv("data_cleaned.csv")
 print("\n✅ Cleaned dataset saved as data_cleaned.csv")
+
+# -------------------------
+# 9. Remove Redundant Features (Correlation > 0.9)
+# -------------------------
+print("\nFeatures BEFORE redundancy cleaning:")
+print(df.columns.tolist())
+print("\nTotal features before:", len(df.columns))
+
+# Compute correlation matrix
+corr_matrix = df.corr().abs()
+
+# Select upper triangle of correlation matrix
+upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+
+# Identify features with correlation higher than 0.9
+to_drop = [column for column in upper.columns if any(upper[column] > 0.9)]
+
+print("\nHighly correlated features to drop (|ρ| > 0.9):")
+print(to_drop)
+
+# Drop them
+df_reduced = df.drop(columns=to_drop)
+
+print("\nFeatures AFTER redundancy cleaning:")
+print(df_reduced.columns.tolist())
+print("\nTotal features after:", len(df_reduced.columns))
+
+# Save reduced dataset
+df_reduced.to_csv("data_reduced.csv")
+print("\n✅ Reduced dataset saved as data_reduced.csv")
+
+# -------------------------
+# 10. Correlation Heatmap After Feature Reduction
+# -------------------------
+plt.figure(figsize=(12,8))
+sns.heatmap(df_reduced.corr(), cmap='coolwarm', annot=True, fmt=".2f")
+plt.title("Feature Correlation Heatmap (After Reducing Features)")
+plt.show()
+

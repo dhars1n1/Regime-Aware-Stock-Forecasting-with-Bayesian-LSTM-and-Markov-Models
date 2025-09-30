@@ -1,185 +1,229 @@
-# Data Folder Runbook 🚦
+# README: Workflow for Creating the Final Dataset
 
-## Quick Overview
+This folder processes financial data, performs sentiment analysis, and applies regime-switching models to create a final enriched dataset. Below is a step-by-step guide to running the code files in the correct order, along with detailed explanations of what each file does.
 
-The data processing pipeline consists of four main scripts that should be run in order:
+---
 
-```
-data_creation.py → download + enrich raw market + macro → data.csv
-eda.py → clean & explore → data_cleaned.csv
-sentiment.py (optional) → (hybrid offline or Twitter + FinBERT) → data_with_sentiment.csv
-feature_regime_preprocessing.py → scale, build lags, run multivariate MSM → data_with_regimes.csv
-```
+## **1. `data/dataset_creation.py`**
 
-## Files & What They Do
+### **Purpose:**
+This script is the starting point for creating the dataset. It downloads financial data, computes technical indicators, and merges macroeconomic data from 2008-2024.
 
-### `data_creation.py`
-- **Purpose**: Download S&P 500 (^GSPC) & ^VIX with yfinance, compute technical indicators (RSI, MACD, BBands, OBV), pull FRED macro series, add simple flags (is_crisis, earnings_season), forward-fill and save
-- **Inputs**: None (reads environment variable for FRED API key if using FRED)
-- **Outputs**: `data.csv` (raw enriched CSV)
-- **Run if**: You need to regenerate market + macro features from the web
+### **Steps Performed:**
 
-### `eda.py`
-- **Purpose**: Fix CSV header (handles two header rows), parse Date, compute log returns, run stationarity test (ADF), basic plots, and save cleaned file
-- **Inputs**: `data.csv`
-- **Outputs**: `data_cleaned.csv`
-- **Run if**: You want a cleaned, indexed dataset ready for modeling
+1. **Download Financial Data:**
+   - Downloads S&P 500 (`^GSPC`) and VIX (`^VIX`) data using the `yfinance` library.
+   - Extracts key columns like `Open`, `High`, `Low`, `Close`, `Volume`, and `VIX`.
 
-### `sentiment.py`
-- **Purpose**: Merge historical sentiment data from the **American Association of Individual Investors** Excel file into your main dataset.
-- **Logic**:
-  1. Reads `sentiment.xls` (skips the first 4 non-data rows).
-  2. Cleans `"xx.x%"` strings into floats for **Bullish**, **Neutral**, **Bearish**.
-  3. Drops rows with no sentiment data.
-  4. Creates `sentiment_score` = Bullish − Bearish.
-  5. Merges sentiment into `data_cleaned.csv` using nearest past date (`merge_asof`), forward-filling values.
-- **Inputs**:
-  - `data_cleaned.csv` (from `eda.py`)
-  - `sentiment.xls` (historical AAII sentiment Excel file)
-- **Outputs**: `data_with_sentiment.csv` — main dataset with added `Bullish`, `Neutral`, `Bearish`, and `sentiment_score`.
-- **Run if**: You have the AAII sentiment Excel and want it included as a predictive feature.
-- **Python version**: Works fine on Python 3.13
-- **Run**:
-  ```bash
-  python data/sentiment.py
-  ```
+2. **Compute Technical Indicators:**
+   - Calculates indicators such as RSI, MACD, Bollinger Bands, and On-Balance Volume (OBV) using the `ta` library.
 
-### `msm/msm.py`
-- **Purpose**: Contains the from-scratch multivariate MSM implementation (Baum–Welch EM, forward/backward, Viterbi). Exposes function `baum_welch_multivariate(obs, K=3, ...)`
-- **Inputs**: Numeric observation array (T × D) — the preprocessing script passes [log_return, VIX] by default
-- **Outputs**: Dict containing pi, A, means, covs, gamma, viterbi
+3. **Merge Macroeconomic Data:**
+   - Fetches macroeconomic data (CPI, Unemployment, Fed Funds Rate) from the FRED API.
+   - Adds these as columns to the dataset.
 
-### `feature_regime_preprocessing.py`
-- **Purpose**: Orchestrates final preprocessing:
-  - Loads `data_with_sentiment.csv`
-  - Builds log_return, lag features, normalizes features
-  - Prepares multivariate observation array (default: log_return + VIX)
-  - Calls `msm.baum_welch_multivariate(...)`
-  - Attaches regime_k_prob, regime_viterbi, regime_label
-  - Saves `data_with_regimes.csv`
-- **Inputs**: `data_with_sentiment.csv` (and `msm/msm.py` in parent folder — imports via sys.path adjustment)
-- **Outputs**: `data_with_regimes.csv` ready for modeling
+4. **Add Extra Features:**
+   - Adds placeholder columns like `sentiment` (set to 0.0 initially), `is_crisis` (binary indicator for VIX > 40), `fed_meeting`, and `earnings_season`.
 
-## Exact Run Order (Recommended)
+5. **Save the Dataset:**
+   - Saves the enriched dataset as `data.csv`.
 
-1. **(Optional)** Create virtual environment (see next section)
+### **Output:**
+- `data.csv`: The enriched dataset with financial, technical, and macroeconomic data.
 
-2. **Step 1**: Generate market and macro data
-   ```bash
-   python data/data_creation.py
-   ```
-   Produces `data/data.csv`
-
-3. **Step 2**: Clean and explore data
-   ```bash
-   python data/eda.py
-   ```
-   Produces `data/data_cleaned.csv`
-
-4. **Step 3** Add sentiment analysis
-   ```bash
-   python data/sentiment.py
-   ```
-   Produces `data/data_with_sentiment.csv` (or overwrites/merges into cleaned file)
-
-5. **Step 4**: Feature engineering and regime detection
-   ```bash
-   python data/feature_regime_preprocessing.py
-   ```
-   Requires `msm/msm.py` accessible from project root (see import help)
-   Produces `data/data_with_regimes.csv`
-
-> **Note**: You can run step 3 (sentiment) any time before step 4. If you skip sentiment, step 4 still works — sentiment will be a placeholder.
-
-## Virtual Environments & Python Versions (Recommended)
-
-Create and activate a venv in the project root:
-
+### **Run Command:**
 ```bash
-# macOS (example)
-python3.13 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-```
-## Dependencies
-
-Install with:
-
-```bash
-pip install -r requirements.txt
+python dataset_creation.py
 ```
 
-**Mac M4 / PyTorch note**: Install PyTorch following the official instructions at https://pytorch.org — select macOS/arm64 (MPS) if you want hardware acceleration. If unsure, `pip install torch` will get a compatible wheel for many setups; follow PyTorch site if issues occur.
+---
 
-## Environment Variables / Config Files
+## **2. `data/eda.py`**
 
-Create `.env` at project root if needed:
+### **Purpose:**
+This script performs exploratory data analysis (EDA) on the dataset created in `data/dataset_creation.py`. It cleans the data, removes redundant features, and prepares a reduced dataset.
 
+### **Steps Performed:**
+
+1. **Load and Clean Data:**
+   - Reads `data.csv` and flattens multi-level headers.
+   - Converts the `Date` column to a datetime index.
+
+2. **Check for Missing Values:**
+   - Identifies and reports missing values in the dataset.
+
+3. **Basic Statistics:**
+   - Computes summary statistics for all columns.
+
+4. **Visualize Key Features:**
+   - Plots the S&P 500 closing price and the VIX index.
+   - Highlights crisis periods where VIX > 40.
+
+5. **Remove Redundant Features:**
+   - Computes a correlation matrix and removes features with a correlation > 0.9.
+
+6. **Save Reduced Dataset:**
+   - Saves the cleaned and reduced dataset as `data_cleaned.csv` and `data_reduced.csv`.
+
+### **Output:**
+- `data_cleaned.csv`: Cleaned dataset with all features.
+- `data_reduced.csv`: Reduced dataset with redundant features removed.
+
+### **Run Command:**
 ```bash
-FRED_API_KEY=your_fred_api_key_here
-```
-
-- `data_creation.py` needs `FRED_API_KEY` to successfully fetch CPI / UNRATE / FEDFUNDS. If not present, that code sets NaNs (or you can edit to skip FRED)
-- `sentiment.py` (online NewsAPI mode) needs `NEWSAPI_KEY`. Offline hybrid uses `news_archive.csv` so you don't need the NewsAPI key
-
-## Example Run Commands
-
-### From Project Root
-
-```bash
-# activate venv
-source .venv/bin/activate
-
-# 1. create market + macros
-python data/data_creation.py
-
-# 2. EDA & clean
-python data/eda.py
-
-# 3. sentiment addition
-python data/sentiment.py
-
-# 4. feature engineering + regimes
-python data/feature_regime_preprocessing.py
-```
-
-### From Data Directory
-
-```bash
-cd data
-python data_creation.py
 python eda.py
+```
+
+---
+
+## **3. `data/sentiment.py`**
+
+### **Purpose:**
+This script performs sentiment analysis on S&P 500 news headlines and merges the sentiment scores with the reduced dataset.
+
+### **Steps Performed:**
+
+1. **Load Datasets:**
+   - Reads `data_reduced.csv` (main dataset) and `data/sp500_headlines.csv` (news headlines).
+   - Source of news headlines: [Kaggle News Sentiment Dataset](https://www.kaggle.com/datasets/dyutidasmahaptra/s-and-p-500-with-financial-news-headlines-20082024?resource=download)
+
+2. **Sentiment Analysis:**
+   - Uses the VADER sentiment analyzer to compute sentiment scores for each headline.
+   - Aggregates daily sentiment scores.
+
+3. **Merge Sentiment with Main Dataset:**
+   - Joins the daily sentiment scores with the main dataset.
+   - Fills missing sentiment values with 0.
+
+4. **Feature Scaling:**
+   - Scales all features (except returns) using StandardScaler.
+
+5. **Save Final Dataset:**
+   - Saves the merged and scaled dataset as `data_with_news_sentiment.csv`.
+
+### **Output:**
+- `data_with_news_sentiment.csv`: Dataset with sentiment scores added.
+
+### **Run Command:**
+```bash
 python sentiment.py
-python feature_regime_preprocessing.py
 ```
 
-## Import / Path Note (MSM Directory)
+---
 
-If `msm/msm.py` is in a sibling folder to `data/`, `feature_regime_preprocessing.py` must add the project root to sys.path before importing:
+## **4. `data/regime.py`**
 
-```python
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from msm.msm import baum_welch_multivariate
+### **Purpose:**
+This script applies a custom multivariate Markov Switching Model (MSM) to identify market regimes (Crisis, Normal, Bull) based on returns and VIX.
+
+### **Steps Performed:**
+
+1. **Load Dataset:**
+   - Reads `data_with_news_sentiment.csv`.
+
+2. **Compute Log Returns:**
+   - Calculates log returns of the S&P 500.
+
+3. **Fit MSM:**
+   - Uses the `baum_welch_multivariate` function to fit a 3-regime MSM.
+   - Identifies regime probabilities and hard regime assignments.
+
+4. **Add Regime Information:**
+   - Adds regime probabilities and labels (Crisis, Normal, Bull) to the dataset.
+   - One-hot encodes the regime labels.
+
+5. **Save Dataset with Regimes:**
+   - Saves the dataset with regime information as `data_with_regimes.csv`.
+
+6. **Visualize Regimes:**
+   - Plots the S&P 500 returns with regime labels.
+
+### **Output:**
+- `data_with_regimes.csv`: Dataset with market regimes added.
+
+### **Run Command:**
+```bash
+python regime.py
 ```
 
-## Expected Outputs (Summary)
+---
 
-- `data/data.csv` — enriched raw CSV (from `data_creation.py`)
-- `data/data_cleaned.csv` — cleaned, indexed CSV with returns (from `eda.py`)
-- `data/data_with_sentiment.csv` — cleaned + sentiment merged (if sentiment run)
-- `data/data_with_regimes.csv` — final CSV with scaled features, lag features, regime_k_prob, regime_viterbi, regime_label (from `feature_regime_preprocessing.py`)
+## **5. `data/check_sentiment.py`**
 
-## Runtime Expectations / Tips
+### **Purpose:**
+This script evaluates the predictive value of sentiment scores using correlation analysis, Granger causality tests, and feature importance analysis.
 
-- **`data_creation.py`**: Minutes (downloads market+macro data)
-- **`eda.py`**: Seconds to minutes
-- **`sentiment.py`**: Slow for long ranges (FinBERT inference on CPU): batches & yearly chunks recommended. Use `max_tweets_per_day=50` for speed
-- **`feature_regime_preprocessing.py`**: EM on ~9k rows with multivariate MSM usually tens of seconds to a few minutes, depending on max_iter and dimensionality; add logging for iterations to monitor convergence
+### **Steps Performed:**
 
-## Troubleshooting Checklist
+1. **Correlation Analysis:**
+   - Computes correlations between sentiment scores and key variables (e.g., returns, VIX).
 
-- **If import snscrape fails**: Use Python 3.11 venv or call snscrape CLI with subprocess
-- **If HuggingFace model downloads hang**: Check internet or allow the large pytorch_model.bin download (approx 400+ MB). Cache is in `~/.cache/huggingface/transformers`
-- **If msm import fails**: Ensure sys.path is set in `feature_regime_preprocessing.py`, or run the script from project root
-- **If the MSM EM doesn't converge**: Try different initialization (KMeans) or increase max_iter
+2. **Granger Causality Test:**
+   - Tests whether sentiment scores can predict returns.
+
+3. **Feature Importance:**
+   - Uses a Random Forest model to evaluate the importance of sentiment scores in predicting returns.
+
+4. **Rolling Regression:**
+   - Computes rolling regression betas of returns on sentiment scores.
+
+5. **Summary Heuristic:**
+   - Summarizes the findings and provides insights into the usefulness of sentiment scores.
+
+### **Output:**
+- Visualizations of sentiment vs. returns, feature importance, and rolling regression betas.
+
+### **Run Command:**
+```bash
+python check_sentiment.py
+```
+
+---
+
+## **6. `data/no.py`**
+
+### **Purpose:**
+This script tests different numbers of regimes for a Markov Switching Model using exogenous variables (e.g., RSI, MACD, VIX, sentiment).
+
+### **Steps Performed:**
+
+1. **Load Dataset:**
+   - Reads `data_with_news_sentiment.csv`.
+
+2. **Fit Markov Switching Models:**
+   - Fits models with 1 to 10 regimes using `MarkovRegression`.
+   - Includes exogenous variables like RSI, MACD, VIX, and sentiment.
+
+3. **Evaluate Models:**
+   - Computes AIC and BIC for each model.
+   - Identifies the optimal number of regimes based on BIC.
+
+### **Output:**
+- Optimal number of regimes based on BIC.
+
+### **Run Command:**
+```bash
+python no.py
+```
+
+---
+
+## **Final Dataset:**
+
+The final dataset, `data_with_regimes.csv`, contains:
+
+- Financial data (e.g., returns, VIX, RSI, MACD).
+- Macroeconomic data (e.g., CPI, Unemployment, Fed Funds Rate).
+- Sentiment scores from news headlines.
+- Market regimes (Crisis, Normal, Bull) with probabilities and one-hot encoding.
+
+---
+
+## **Order of Execution:**
+
+1. `data/dataset_creation.py`
+2. `data/eda.py`
+3. `data/sentiment.py`
+4. `data/regime.py`
+5. `data/check_sentiment.py` (optional, for analysis)
+6. `data/no.py` (optional, for regime testing)

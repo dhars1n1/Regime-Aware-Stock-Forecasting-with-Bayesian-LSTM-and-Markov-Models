@@ -1,65 +1,71 @@
 import pandas as pd
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
+from sklearn.preprocessing import StandardScaler
 
-# =========================
-# CONFIG
-# =========================
-sentiment_file = "Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/sentiment.xls"  # Path to your sentiment Excel
-main_data_file = "Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_cleaned.csv"  # Path to your main stock data
-output_file = "Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data_with_sentiment.csv"
+# Download VADER lexicon if not already
+nltk.download('vader_lexicon')
 
-# =========================
-# LOAD SENTIMENT DATA
-# =========================
-print("📥 Loading sentiment data...")
-sent_df = pd.read_excel(sentiment_file, skiprows=4)  # Skip header rows
-
-# Keep only relevant columns
-sent_df = sent_df.iloc[:, 0:4]  # Date, Bullish, Neutral, Bearish
-sent_df.columns = ["Date", "Bullish", "Neutral", "Bearish"]
+# -------------------------
+# 1. Load datasets
+# -------------------------
+df = pd.read_csv("data_reduced.csv", index_col=0, parse_dates=True)  # your enriched dataset
+news = pd.read_csv("sp500_headlines.csv")  # Kaggle dataset (2008–2024)
 
 # Convert date
-sent_df["Date"] = pd.to_datetime(sent_df["Date"], errors="coerce")
+news['Date'] = pd.to_datetime(news['Date'])
 
-# Remove rows without a date
-sent_df = sent_df.dropna(subset=["Date"])
+# -------------------------
+# 2. Sentiment analysis
+# -------------------------
+sia = SentimentIntensityAnalyzer()
 
-# Function to convert percentage strings like "36.0%" → 36.0
-def pct_to_float(x):
-    if isinstance(x, str) and "%" in x:
-        return float(x.replace("%", ""))
-    return pd.to_numeric(x, errors="coerce")
+def get_daily_sentiment(row):
+    headlines = row.drop('Date').dropna().astype(str).tolist()
+    scores = [sia.polarity_scores(h)['compound'] for h in headlines]
+    return sum(scores)/len(scores) if scores else 0
 
-for col in ["Bullish", "Neutral", "Bearish"]:
-    sent_df[col] = sent_df[col].apply(pct_to_float)
+news['sentiment_news'] = news.apply(get_daily_sentiment, axis=1)
 
-# Drop rows where sentiment columns are all NaN
-sent_df = sent_df.dropna(subset=["Bullish", "Neutral", "Bearish"], how="all")
+# Keep only Date + sentiment
+news_sent = news[['Date','sentiment_news']].set_index('Date')
 
-# Create sentiment score
-sent_df["sentiment_score"] = sent_df["Bullish"] - sent_df["Bearish"]
+# -------------------------
+# 3. Merge with main dataset
+# -------------------------
+df = df.join(news_sent, how='left')
 
-print(f"✅ Sentiment data cleaned. Rows: {len(sent_df)}")
+# Fill NaN (before 2008 or missing headlines) with 0
+df['sentiment_news'] = df['sentiment_news'].fillna(0)
 
-# =========================
-# LOAD MAIN STOCK DATA
-# =========================
-print("📥 Loading stock data...")
-main_df = pd.read_csv(main_data_file, parse_dates=["Date"])
+print("\nSample sentiment columns (before dropping):")
+print(df[['sentiment', 'sentiment_news']].head(20))
 
-# =========================
-# MERGE & FORWARD-FILL
-# =========================
-print("🔄 Merging sentiment into stock data...")
-merged = pd.merge_asof(
-    main_df.sort_values("Date"),
-    sent_df.sort_values("Date"),
-    on="Date",
-    direction="backward"
-)
+# -------------------------
+# 4. Drop columns that are fully zero
+# -------------------------
+zero_cols = [col for col in df.columns if (df[col] == 0).all()]
+print("\nColumns with only zeros:", zero_cols)
 
-# Forward-fill
-merged[["Bullish", "Neutral", "Bearish", "sentiment_score"]] = merged[["Bullish", "Neutral", "Bearish", "sentiment_score"]].fillna(method="ffill")
+df = df.drop(columns=zero_cols)
 
-# Save result
-merged.to_csv(output_file, index=False)
-print(f"✅ Sentiment merged and saved to {output_file}")
+# -------------------------
+# 5. Feature scaling
+# -------------------------
+scaler = StandardScaler()
+
+# Don’t scale the target variable (returns), but scale exogenous features
+features_to_scale = [col for col in df.columns if col != 'returns']
+
+df_scaled = df.copy()
+df_scaled[features_to_scale] = scaler.fit_transform(df[features_to_scale])
+
+print("\n✅ Features scaled using StandardScaler")
+print(df_scaled.head())
+
+# -------------------------
+# 6. Save merged + scaled dataset
+# -------------------------
+df_scaled.to_csv("data_with_news_sentiment.csv")
+print("\n✅ Final dataset saved as data_with_news_sentiment.csv")
+print("Final dataset shape:", df_scaled.shape)

@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 # =====================
 # CONFIG
 # =====================
-start = "1985-01-01"
-end = datetime.date.today().strftime("%Y-%m-%d")
+start = "2008-01-02"
+end = "2024-12-31"
 
 # Load environment variables from .env file
 load_dotenv()
@@ -109,5 +109,5 @@ df['earnings_season'] = (
 # =====================
 df = df.ffill().dropna()
 print(f"Final dataset shape: {df.shape}")
-df.to_csv("Regime-Aware-Stock-Forecasting-with-Bayesian-LSTM-and-Markov-Models/data/data.csv")
+df.to_csv("data.csv")
 print("Saved enriched dataset to data.csv")
