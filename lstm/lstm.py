@@ -566,6 +566,57 @@ class BayesianLSTM:
         print(f"- Detailed predictions: detailed_predictions.csv")  
         print(f"- Performance summary: performance_summary.csv")
 
+
+def save_all_inference_artifacts(bayesian_lstm_model, save_path: str = "results"):
+    """
+    Save all model artifacts needed for inference
+    
+    This function saves:
+    1. Feature and target scalers (needed to transform new data)
+    2. Regime encoder (needed to encode regime labels)
+    3. Model metadata (feature names, configuration)
+    
+    Args:
+        bayesian_lstm_model: Trained BayesianLSTM instance
+        save_path: Directory to save artifacts
+    """
+    import pickle
+    import json
+    
+    print(f"💾 Saving inference artifacts to: {save_path}")
+    os.makedirs(save_path, exist_ok=True)
+    
+    # 1. Save scalers (critical for data preprocessing)
+    scalers_file = f"{save_path}/scalers.pkl"
+    with open(scalers_file, 'wb') as f:
+        pickle.dump(bayesian_lstm_model.scalers, f)
+    print(f"✅ Saved scalers: {scalers_file}")
+    
+    # 2. Save regime encoder (needed for regime label transformation)
+    encoder_file = f"{save_path}/regime_encoder.pkl"
+    with open(encoder_file, 'wb') as f:
+        pickle.dump(bayesian_lstm_model.regime_encoder, f)
+    print(f"✅ Saved regime encoder: {encoder_file}")
+    
+    # 3. Save model metadata (configuration and feature info)
+    metadata = {
+        'feature_columns': bayesian_lstm_model.feature_columns,
+        'n_features': bayesian_lstm_model.n_features,
+        'sequence_length': bayesian_lstm_model.sequence_length,
+        'dropout_rate': bayesian_lstm_model.dropout_rate,
+        'lstm_units': bayesian_lstm_model.lstm_units,
+        'monte_carlo_samples': bayesian_lstm_model.monte_carlo_samples,
+        'use_regime_label': bayesian_lstm_model.use_regime_label
+    }
+    
+    metadata_file = f"{save_path}/model_metadata.json"
+    with open(metadata_file, 'w') as f:
+        json.dump(metadata, f, indent=4)
+    print(f"✅ Saved metadata: {metadata_file}")
+    
+    print(f"📦 All inference artifacts saved!")
+
+
 def main():
     print("Starting Regime-Aware Bayesian LSTM Training")
     print("=" * 60)
@@ -627,12 +678,18 @@ def main():
     print("\nSaving results...")
     os.makedirs("results", exist_ok=True)
     
+    # Save the trained model
     model.model.save("results/bayesian_lstm_model.h5")
     print("Model saved to results/bayesian_lstm_model.h5")
+    
+    # Save all artifacts needed for inference
+    print("\nSaving all artifacts for inference...")
+    save_all_inference_artifacts(model, save_path="results")
     
     model.save_predictions_data(test_dates, evaluation_results)
     
     print("\nTraining and evaluation complete!")
+    print("All artifacts saved - ready for inference!")
     print("=" * 60)
     
     return model, evaluation_results
