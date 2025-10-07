@@ -258,7 +258,7 @@ class ModelComparison:
         else:
             print(f"  ○ No significant difference in error distributions (p >= 0.05)")
     
-    def create_comprehensive_visualizations(self, save_path="comparison_results"):
+    def create_comprehensive_visualizations(self, save_path="comparison_results2"):
         """Create comprehensive comparison visualizations"""
         os.makedirs(save_path, exist_ok=True)
         print(f"\nCreating comparison visualizations...")
@@ -439,7 +439,7 @@ class ModelComparison:
         
         print(f"✓ Visualizations saved to {save_path}/")
     
-    def generate_comparison_report(self, save_path="comparison_results"):
+    def generate_comparison_report(self, save_path="comparison_results2"):
         """Generate a comprehensive comparison report"""
         os.makedirs(save_path, exist_ok=True)
         
@@ -523,20 +523,20 @@ class ModelComparison:
         self.analyze_uncertainty_quality()
         
         # Create visualizations
-        self.create_comprehensive_visualizations()
+        self.create_comprehensive_visualizations(save_path="comparison_results2")
         
         # Generate report
-        self.generate_comparison_report()
+        self.generate_comparison_report(save_path="comparison_results2")
         
         print("\n" + "="*80)
         print("✅ COMPARISON COMPLETE!")
         print("="*80)
         print("\nGenerated files:")
-        print("  📊 comparison_results/side_by_side_predictions.png")
-        print("  📊 comparison_results/regime_error_comparison.png")
-        print("  📊 comparison_results/uncertainty_and_error_analysis.png")
-        print("  📊 comparison_results/overall_metrics_comparison.png")
-        print("  📄 comparison_results/comparison_report.txt")
+        print("  📊 comparison_results2/side_by_side_predictions.png")
+        print("  📊 comparison_results2/regime_error_comparison.png")
+        print("  📊 comparison_results2/uncertainty_and_error_analysis.png")
+        print("  📊 comparison_results2/overall_metrics_comparison.png")
+        print("  📄 comparison_results2/comparison_report.txt")
         print("\n" + "="*80)
 
 

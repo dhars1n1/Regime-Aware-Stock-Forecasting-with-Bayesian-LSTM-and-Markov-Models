@@ -417,7 +417,7 @@ class BayesianLSTM:
     
     def create_comprehensive_visualizations(self, test_dates: pd.DatetimeIndex, 
                                           evaluation_results: Dict, 
-                                          save_path: str = "results") -> None:
+                                          save_path: str = "results2") -> None:
         os.makedirs(save_path, exist_ok=True)
         
         predictions = evaluation_results['predictions']
@@ -593,13 +593,13 @@ def save_all_inference_artifacts(bayesian_lstm_model, save_path: str = "results"
     os.makedirs(save_path, exist_ok=True)
     
     # 1. Save scalers (critical for data preprocessing)
-    scalers_file = f"{save_path}/scalers.pkl"
+    scalers_file = f"results2/scalers.pkl"
     with open(scalers_file, 'wb') as f:
         pickle.dump(bayesian_lstm_model.scalers, f)
     print(f"✅ Saved scalers: {scalers_file}")
     
     # 2. Save regime encoder (needed for regime label transformation)
-    encoder_file = f"{save_path}/regime_encoder.pkl"
+    encoder_file = f"results2/regime_encoder.pkl"
     with open(encoder_file, 'wb') as f:
         pickle.dump(bayesian_lstm_model.regime_encoder, f)
     print(f"✅ Saved regime encoder: {encoder_file}")
@@ -615,7 +615,7 @@ def save_all_inference_artifacts(bayesian_lstm_model, save_path: str = "results"
         'use_regime_label': bayesian_lstm_model.use_regime_label
     }
     
-    metadata_file = f"{save_path}/model_metadata.json"
+    metadata_file = f"results2/model_metadata.json"
     with open(metadata_file, 'w') as f:
         json.dump(metadata, f, indent=4)
     print(f"✅ Saved metadata: {metadata_file}")
@@ -682,15 +682,15 @@ def main():
     model.create_comprehensive_visualizations(test_dates, evaluation_results)
     
     print("\nSaving results...")
-    os.makedirs("results", exist_ok=True)
+    os.makedirs("results2", exist_ok=True)
     
     # Save the trained model
-    model.model.save("results/bayesian_lstm_model.h5")
-    print("Model saved to results/bayesian_lstm_model.h5")
+    model.model.save("results2/bayesian_lstm_model.h5")
+    print("Model saved to results2/bayesian_lstm_model.h5")
     
     # Save all artifacts needed for inference
     print("\nSaving all artifacts for inference...")
-    save_all_inference_artifacts(model, save_path="results")
+    save_all_inference_artifacts(model, save_path="results2")
     
     model.save_predictions_data(test_dates, evaluation_results)
     

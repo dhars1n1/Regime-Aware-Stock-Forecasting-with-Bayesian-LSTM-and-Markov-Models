@@ -2,6 +2,7 @@
 Regime-Aware Standard LSTM for Stock Price Forecasting
 Comparison baseline for Bayesian LSTM
 """
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -440,22 +441,18 @@ class StandardLSTM:
         results_df['Absolute_Error'] = np.abs(results_df['Actual_Return'] - results_df['Predicted_Return'])
         results_df['Squared_Error'] = (results_df['Actual_Return'] - results_df['Predicted_Return'])**2
         
-        results_df.to_csv(f"{save_path}/detailed_predictions_standard.csv", index=False)
+        # Calculate summary statistics for performance
+        summary_df = pd.DataFrame({
+            'Metric': ['MSE', 'MAE', 'RMSE'],
+            'Value': [
+                mean_squared_error(results_df['Actual_Return'], results_df['Predicted_Return']),
+                mean_absolute_error(results_df['Actual_Return'], results_df['Predicted_Return']),
+                np.sqrt(mean_squared_error(results_df['Actual_Return'], results_df['Predicted_Return']))
+            ]
+        })
         
-        summary_stats = {
-            'Overall_MSE': evaluation_results['overall']['mse'],
-            'Overall_MAE': evaluation_results['overall']['mae'],
-            'Overall_RMSE': evaluation_results['overall']['rmse'],
-            'Overall_R2': evaluation_results['overall']['r2'],
-            'Residual_Std': evaluation_results['overall']['residual_std']
-        }
-        
-        for regime, stats in evaluation_results['by_regime'].items():
-            for metric, value in stats.items():
-                summary_stats[f'{regime}_{metric}'] = value
-        
-        summary_df = pd.DataFrame([summary_stats])
-        summary_df.to_csv(f"{save_path}/performance_summary_standard.csv", index=False)
+        results_df.to_csv(f"results2_standard/detailed_predictions_standard.csv", index=False)
+        summary_df.to_csv(f"results2_standard/performance_summary_standard.csv", index=False)
         
         print(f"Prediction data saved to {save_path}/")
         print(f"- Detailed predictions: detailed_predictions_standard.csv")
@@ -520,10 +517,10 @@ def main():
     model.create_comprehensive_visualizations(test_dates, evaluation_results)
     
     print("\nSaving results...")
-    os.makedirs("results_standard", exist_ok=True)
+    os.makedirs("results2_standard", exist_ok=True)
     
-    model.model.save("results_standard/standard_lstm_model.h5")
-    print("Model saved to results_standard/standard_lstm_model.h5")
+    model.model.save("results2_standard/standard_lstm_model.h5")
+    print("Model saved to results2_standard/standard_lstm_model.h5")
     
     model.save_predictions_data(test_dates, evaluation_results)
     
