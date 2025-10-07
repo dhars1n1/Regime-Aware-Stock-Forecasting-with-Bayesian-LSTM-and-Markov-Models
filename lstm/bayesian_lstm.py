@@ -69,21 +69,23 @@ class BayesianLSTM:
         self.model = model
         return model
     
+
+
     def prepare_regime_aware_features(self, df: pd.DataFrame) -> pd.DataFrame:
         market_features = ['log_return', 'Volume', 'VIX']
         technical_features = ['RSI', 'MACD_diff', 'BB_high', 'BB_low', 'OBV']
-        
+    
         macro_features = []
         for feature in ['CPI', 'Unemployment', 'FedFunds']:
             if feature in df.columns and df[feature].notna().mean() > 0.8:
                 macro_features.append(feature)
-        
+    
         lag_features = []
         for lag in [1, 2, 3, 5]:
             lag_col = f'return_lag_{lag}'
             if lag_col in df.columns:
                 lag_features.append(lag_col)
-        
+    
         if self.use_regime_label and 'regime_label' in df.columns:
             regime_features = ['regime_label']
         else:
@@ -92,16 +94,17 @@ class BayesianLSTM:
                 prob_col = f'regime_{i}_prob'
                 if prob_col in df.columns:
                     regime_features.append(prob_col)
-        
+    
         volatility_features = []
         if 'log_return' in df.columns:
             df['volatility_5d'] = df['log_return'].rolling(5).std()
             volatility_features = ['volatility_5d']
-        
+    
+        # ✅ Updated here: using 'sentiment_news' instead of 'sentiment_score'
         sentiment_features = []
-        if 'sentiment_score' in df.columns and df['sentiment_score'].notna().mean() > 0.5:
-            sentiment_features = ['sentiment_score']
-        
+        if 'sentiment_news' in df.columns and df['sentiment_news'].notna().mean() > 0.5:
+            sentiment_features = ['sentiment_news']
+    
         all_feature_groups = [
             ('Market', market_features),
             ('Technical', technical_features),
@@ -111,24 +114,24 @@ class BayesianLSTM:
             ('Volatility', volatility_features),
             ('Sentiment', sentiment_features)
         ]
-        
+    
         self.feature_columns = []
         feature_summary = {}
-        
+    
         for group_name, features in all_feature_groups:
             available = [f for f in features if f in df.columns]
             self.feature_columns.extend(available)
             feature_summary[group_name] = len(available)
             if available:
                 print(f"- {group_name}: {available}")
-        
+    
         print(f"\nTotal features: {len(self.feature_columns)}")
         for group, count in feature_summary.items():
             if count > 0:
                 print(f"  {group}: {count}")
-        
+    
         feature_df = df[self.feature_columns].copy()
-        
+    
         if self.use_regime_label and 'regime_label' in self.feature_columns:
             from sklearn.preprocessing import LabelEncoder
             if self.regime_encoder is None:
@@ -136,8 +139,10 @@ class BayesianLSTM:
                 feature_df['regime_label'] = self.regime_encoder.fit_transform(feature_df['regime_label'])
             else:
                 feature_df['regime_label'] = self.regime_encoder.transform(feature_df['regime_label'])
-        
+    
         return feature_df
+    
+    
     
     def create_sequences(self, feature_data: pd.DataFrame, target_data: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         X, y = [], []
@@ -266,7 +271,8 @@ class BayesianLSTM:
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[early_stopping, reduce_lr],
-            verbose=1
+            verbose=1,
+            shuffle=False
         )
         
         return history
